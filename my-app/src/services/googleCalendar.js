@@ -25,7 +25,7 @@ export const fetchCalendarEvents = async (accessToken) => {
   
   export const createCalendarEvent = async (accessToken, event) => {
     const response = await fetch(
-      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      '${process.env.REACT_APP_API_BASE_URL}/calendar',
       {
         method: 'POST',
         headers: {
@@ -40,7 +40,9 @@ export const fetchCalendarEvents = async (accessToken) => {
     return await response.json();
   };
   
-  export const updateCalendarEvent = async (accessToken, eventId, event) => {
+// TODO: remake the rest of these in backend
+
+  export const updateCalendarEvent = async (accessToken, eventId, event) => { 
     const response = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
       {

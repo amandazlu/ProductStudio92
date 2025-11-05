@@ -5,7 +5,7 @@ export default function Header({ clearChat, toggleSettings, toggleCalendar, show
     return (
       <div className="flex items-center justify-between p-4 bg-gray-800 border-b border-gray-700">
         <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-          OpenAI Chat + Calendar
+          ClearMind AI
         </h1>
         <div className="flex gap-2">
           <button onClick={toggleCalendar} className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600" title="Calendar">

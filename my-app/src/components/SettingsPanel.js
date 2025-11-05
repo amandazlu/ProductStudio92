@@ -5,7 +5,7 @@ export default function SettingsPanel({ apiKey, setApiKey, model, setModel }) {
     <div className="p-4 bg-gray-800 border-b border-gray-700">
       <div className="max-w-2xl mx-auto space-y-3">
         <div>
-          <label className="block text-sm font-medium mb-1">OpenAI API Key</label>
+          <label className="block text-sm font-medium mb-1">OpenAI API Key </label>
           <input
             type="password"
             value={apiKey}
@@ -15,7 +15,7 @@ export default function SettingsPanel({ apiKey, setApiKey, model, setModel }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Model</label>
+          <label className="block text-sm font-medium mb-1">Model </label>
           <select
             value={model}
             onChange={(e) => setModel(e.target.value)}
