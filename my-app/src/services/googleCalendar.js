@@ -1,74 +1,41 @@
 // src/services/googleCalendar.js
 
-export const fetchCalendarEvents = async (accessToken) => {
-    try {
-      const now = new Date();
-      const timeMin = now.toISOString();
-      const timeMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
-  
-      const response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }
-      );
-  
-      if (!response.ok) throw new Error('Failed to fetch events');
-  
-      const data = await response.json();
-      return data.items || [];
-    } catch (error) {
-      console.error('Error fetching calendar events:', error);
-      throw error;
-    }
-  };
-  
-  export const createCalendarEvent = async (accessToken, event) => {
-    const response = await fetch(
-      '${process.env.REACT_APP_API_BASE_URL}/calendar',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(event),
-      }
-    );
-  
-    if (!response.ok) throw new Error('Failed to create event');
-    return await response.json();
-  };
-  
-// TODO: remake the rest of these in backend
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/api';
 
-  export const updateCalendarEvent = async (accessToken, eventId, event) => { 
-    const response = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(event),
-      }
-    );
-  
-    if (!response.ok) throw new Error('Failed to update event');
-    return await response.json();
-  };
-  
-  export const deleteCalendarEvent = async (accessToken, eventId) => {
-    const response = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
-      {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
-    );
-  
-    if (!response.ok) throw new Error('Failed to delete event');
-    return true;
-  };
-  
+// Fetch all events for the signed-in user
+export async function fetchCalendarEvents(accessToken) {
+  const response = await fetch(`${API_BASE_URL}/calendar?accessToken=${accessToken}`);
+  if (!response.ok) throw new Error('Failed to fetch events in frontend');
+  return await response.json();
+}
+
+// Create a new event
+export async function createCalendarEvent(accessToken, eventData) {
+  const response = await fetch(`${API_BASE_URL}/calendar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accessToken, eventData }),
+  });
+  if (!response.ok) throw new Error('Failed to create event');
+  return await response.json();
+}
+
+// Update an existing event
+export async function updateCalendarEvent(accessToken, eventId, updatedData) {
+  const response = await fetch(`${API_BASE_URL}/calendar/${eventId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accessToken, updatedData }),
+  });
+  if (!response.ok) throw new Error('Failed to update event');
+  return await response.json();
+}
+
+// Delete an event
+export async function deleteCalendarEvent(accessToken, eventId) {
+  const response = await fetch(`${API_BASE_URL}/calendar/${eventId}?accessToken=${accessToken}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete event');
+  return true;
+}

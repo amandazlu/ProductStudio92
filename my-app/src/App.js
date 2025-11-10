@@ -3,6 +3,7 @@ import Header from './components/Header';
 import SettingsPanel from './components/SettingsPanel';
 import MessageList from './components/MessageList';
 import InputArea from './components/InputArea';
+import CalendarView from './components/CalendarView';
 import useSpeechToText from './hooks/useSpeechToText';
 import RecordButton from './components/RecordButton';
 import { sendMessageToOpenAI } from './services/openAI';
@@ -73,13 +74,16 @@ export default function App() {
     }
   };
 
-  // 🗓️ Example wrapper to add new events (calls your service)
+  // Calendar handlers
   const handleAddEvent = async (eventData) => {
-    if (!googleAccessToken) {
-      alert('Please sign in to Google Calendar first');
-      return;
-    }
+    if (!googleAccessToken) return alert('Please sign in first');
     await createCalendarEvent(googleAccessToken, eventData);
+    const updatedEvents = await fetchCalendarEvents(googleAccessToken);
+    setCalendarEvents(updatedEvents);
+  };
+
+  const handleUpdateEvent = async (eventId, updatedData) => {
+    await updateCalendarEvent(googleAccessToken, eventId, updatedData);
     const updatedEvents = await fetchCalendarEvents(googleAccessToken);
     setCalendarEvents(updatedEvents);
   };
@@ -119,29 +123,10 @@ export default function App() {
               Sign in to Google Calendar
             </button>
           ) : (
-            <>
-              <h2 className="text-lg font-semibold mb-2">Upcoming Events</h2>
-              {loadingEvents ? (
-                <p>Loading events...</p>
-              ) : (
-                <ul>
-                  {calendarEvents.map(event => (
-                    <li
-                      key={event.id}
-                      className="border-b py-2 flex justify-between items-center"
-                    >
-                      <span>{event.summary || '(No Title)'}</span>
-                      <button
-                        className="text-red-500 text-sm"
-                        onClick={() => handleDeleteEvent(event.id)}
-                      >
-                        Delete
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
+            <CalendarView
+              googleAccessToken={googleAccessToken}
+              onAddEvent={handleAddEvent}
+            />
           )}
         </div>
       )}

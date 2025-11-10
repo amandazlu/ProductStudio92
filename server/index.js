@@ -5,12 +5,27 @@ import whisperRoutes from './routes/whisper.js';
 import calendarRoutes from './routes/calendar.js';
 
 dotenv.config();
+
 const app = express();
-app.use(cors());
+
+app.use(cors({
+    origin: 'http://localhost:3000', // allow your React app
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
+  
 app.use(express.json());
 
-app.use('/api/whisper', whisperRoutes);
-app.use('/api/calendar', calendarRoutes);
+// DEBUG: log every incoming request
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
 
-const PORT = process.env.PORT || 5000;
+app.use('/api/calendar', calendarRoutes);
+// app.use('/api/whisper', whisperRoutes);
+
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// Nothing after this
