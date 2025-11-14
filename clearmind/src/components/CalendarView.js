@@ -6,7 +6,7 @@ import ReactDOM from 'react-dom';
 import {
   fetchCalendarEvents,
   createCalendarEvent
-} from '../services/googleCalendar';
+} from '../services/googleCalendar.js';
 
 const localizer = momentLocalizer(moment);
 

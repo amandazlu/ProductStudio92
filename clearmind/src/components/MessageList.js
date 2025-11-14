@@ -13,8 +13,8 @@ export default function MessageList({ messages, loading }) {
       <div className="max-w-3xl mx-auto space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-400 mt-20">
-            <p className="text-lg mb-2">Welcome to OpenAI Chat + Calendar</p>
-            <p className="text-sm">Enter your API key in settings to get started</p>
+            <p className="text-lg mb-2">Welcome to ClearMind AI</p>
+            <p className="text-sm">How are things going today?</p>
           </div>
         )}
 

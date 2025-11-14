@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { transcribeAudio } from '../services/whisper';
+import { transcribeAudio } from '../services/whisper.js';
 
 export default function RecordButton({ onTranscribed }) {
   const [recording, setRecording] = useState(false);

@@ -16,8 +16,8 @@ export async function generateCalendarEventFromText(text) {
       {
         "summary": "Event title",
         "description": "Optional description",
-        "start": "2025-11-12T15:00:00-05:00",
-        "end": "2025-11-12T15:30:00-05:00"
+        "start": "2025-11-14T15:00:00-05:00",
+        "end": "2025-11-14T15:30:00-05:00"
       }
 
       The "start" and "end" fields must be ISO 8601 date-time strings. Default duration: 30 minutes.

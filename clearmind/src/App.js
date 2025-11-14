@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import Header from './components/Header';
-import SettingsPanel from './components/SettingsPanel';
-import MessageList from './components/MessageList';
-import InputArea from './components/InputArea';
-import CalendarView from './components/CalendarView';
-import useSpeechToText from './hooks/useSpeechToText';
-import RecordButton from './components/RecordButton';
-import { sendMessageToOpenAI } from './services/openAI';
+import Header from './components/Header.js';
+import SettingsPanel from './components/SettingsPanel.js';
+import MessageList from './components/MessageList.js';
+import InputArea from './components/InputArea.js';
+import CalendarView from './components/CalendarView.js';
+import useSpeechToText from './hooks/useSpeechToText.js';
+import { sendMessageToOpenAI } from './services/openAI.js';
 import {
   fetchCalendarEvents,
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent
-} from './services/googleCalendar';
+} from './services/googleCalendar.js';
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
 
@@ -23,6 +22,7 @@ export default function App() {
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('gpt-3.5-turbo');
   const [showSettings, setShowSettings] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   // Google Calendar-related states
   const [googleAccessToken, setGoogleAccessToken] = useState('');
@@ -103,7 +103,10 @@ export default function App() {
         body: JSON.stringify({ text })
       });
       const eventData = await response.json();
-
+      if (typeof eventData == 'string') {
+        setMessages(prev => [...prev, { role: 'assistant', content: eventData }]);
+        speakText(eventData);
+      }
       // Automatically create event in Google Calendar
       if (googleAccessToken && eventData) {
         const created = await createCalendarEvent(googleAccessToken, eventData);
@@ -126,6 +129,23 @@ export default function App() {
     }
   };
 
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1; // Speed (0.1 to 10)
+      utterance.pitch = 1; // Pitch (0 to 2)
+      utterance.volume = 1; // Volume (0 to 1)
+      
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   const { isRecording, toggleRecording, transcript } = useSpeechToText(handleTranscriptComplete);
   useEffect(() => {

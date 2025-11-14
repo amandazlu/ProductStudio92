@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import calendarRoutes from './routes/calendar.js';
 import speechRoutes from './routes/speech.js';
 import { speech } from 'googleapis/build/src/apis/speech/index.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -17,6 +19,10 @@ app.use(cors({
   }));
   
 app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use(express.static(path.join(__dirname, '../build')));
 
 // DEBUG: log every incoming request
 app.use((req, res, next) => {
