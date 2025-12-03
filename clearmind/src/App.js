@@ -37,6 +37,7 @@ export default function App() {
 
   // Recently created events for update context
   const [recentlyCreatedEvents, setRecentlyCreatedEvents] = useState([]);
+  const [pendingReschedule, setPendingReschedule] = useState(null);
 
   // User preference settings
   const [userSettings, setUserSettings] = useState({
@@ -191,21 +192,73 @@ export default function App() {
   const processMessage = async (text) => {
     const userMessage = { role: 'user', content: text };
     setMessages(prev => [...prev, userMessage]);
+    
+    // Add immediate acknowledgment
+    const thinkingMessages = [
+      "Got it, let me think about that...",
+      "One moment, I'm processing...",
+      "Thinking about what you said...",
+      "I hear you...",
+      "Understood, I'm thinking..."
+    ];
+    const randomThinking = thinkingMessages[Math.floor(Math.random() * thinkingMessages.length)];
+    
+    const thinkingMessage = { role: 'assistant', content: randomThinking, isTemporary: true };
+    setMessages(prev => [...prev, thinkingMessage]);
+    // Play TTS for thinking message immediately
+    // if (userSettings.tts.enabled && !isSpeaking) {
+    //   playTextToSpeech(randomThinking, setIsSpeaking, userSettings);
+    // }
     setLoading(true);
-
+  
     try {
       const conversationHistory = messages.map(msg => ({
         role: msg.role,
         content: msg.content
       }));
-
+  
       console.log('=== FRONTEND: Processing Message ===');
       console.log('Input text:', text);
-      console.log('Calendar events count:', calendarEvents?.length || 0);
-      console.log('Recently created events:', recentlyCreatedEvents.length);
       
-      // Check for update intent FIRST
-      console.log('Checking for update intent...');
+      // PRIORITY 1: Check if we have a pending reschedule
+      if (pendingReschedule) {
+        console.log('Pending reschedule detected:', pendingReschedule);
+        
+        // Check if user is canceling
+        const cancelWords = ['no', 'wrong', 'not that', 'different', 'cancel', 'nevermind'];
+        if (cancelWords.some(word => text.toLowerCase().includes(word))) {
+          console.log('User canceling pending reschedule');
+          setMessages(prev => prev.filter(m => !m.isTemporary));
+          setPendingReschedule(null);
+          
+          const cancelMessage = "No problem! Which event did you want to reschedule?";
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: cancelMessage
+          }]);
+          
+          if (userSettings.tts.enabled) {
+            playTextToSpeech(cancelMessage, setIsSpeaking, userSettings);
+          }
+          
+          setLoading(false);
+          return;
+        }
+        
+        // Check if the user is providing a new time
+        const updateAnalysis = await checkUpdateIntent(text, [pendingReschedule], []);
+        
+        console.log('Followup update analysis:', updateAnalysis);
+        
+        if (updateAnalysis.newTime || updateAnalysis.newDate) {
+          setMessages(prev => prev.filter(m => !m.isTemporary));
+          await handleEventUpdate(updateAnalysis, pendingReschedule);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // PRIORITY 2: Check for update intent
       const updateAnalysis = await checkUpdateIntent(text, recentlyCreatedEvents, calendarEvents);
       
       console.log('=== UPDATE ANALYSIS RESULT ===');
@@ -213,44 +266,75 @@ export default function App() {
       console.log('Confidence:', updateAnalysis.confidence);
       console.log('Event to update:', updateAnalysis.eventToUpdate);
       console.log('New time:', updateAnalysis.newTime);
-      console.log('Reasoning:', updateAnalysis.reasoning);
       console.log('==============================');
       
       if (updateAnalysis.isUpdateRequest && updateAnalysis.confidence > 0.5) {
-        const eventName = updateAnalysis.eventToUpdate.toLowerCase();
+        const eventNameFromAI = (updateAnalysis.eventToUpdate || '').toLowerCase();
         
-        console.log('Searching for event with name:', eventName);
+        console.log('Searching for event matching:', eventNameFromAI);
+        console.log('Available events:', [...recentlyCreatedEvents, ...calendarEvents].map(e => ({
+          title: e.summary || e.title,
+          start: e.start
+        })));
         
-        const eventToUpdate = [...recentlyCreatedEvents, ...calendarEvents].find(e => {
+        // Try multiple matching strategies
+        let eventToUpdate = null;
+        
+        // Strategy 1: Exact match
+        eventToUpdate = [...recentlyCreatedEvents, ...calendarEvents].find(e => {
           const eName = (e.summary || e.title || '').toLowerCase();
-          const match = eName.includes(eventName) || eventName.includes(eName);
-          return match;
+          return eName === eventNameFromAI;
         });
-
+        
+        // Strategy 2: Event name contains the search term
+        if (!eventToUpdate) {
+          eventToUpdate = [...recentlyCreatedEvents, ...calendarEvents].find(e => {
+            const eName = (e.summary || e.title || '').toLowerCase();
+            return eName.includes(eventNameFromAI);
+          });
+        }
+        
+        // Strategy 3: Search term contains significant words from event name
+        if (!eventToUpdate) {
+          eventToUpdate = [...recentlyCreatedEvents, ...calendarEvents].find(e => {
+            const eName = (e.summary || e.title || '').toLowerCase();
+            const eventWords = eventNameFromAI.split(' ').filter(w => w.length > 3); // Words longer than 3 chars
+            return eventWords.some(word => eName.includes(word));
+          });
+        }
+        
+        console.log('Found event:', eventToUpdate ? (eventToUpdate.summary || eventToUpdate.title) : 'NONE');
+      
         if (eventToUpdate) {
           console.log('✓ Found event to update:', eventToUpdate);
+          setMessages(prev => prev.filter(m => !m.isTemporary));
           await handleEventUpdate(updateAnalysis, eventToUpdate);
           setLoading(false);
           return;
+        } else {
+          console.log('✗ No matching event found for:', eventNameFromAI);
+          // Fall through to regular processing
         }
       }
-      
-      console.log('=====================================');
-
+  
+      // PRIORITY 3: Regular message processing
       const response = await processUserInput(text, conversationHistory, calendarEvents, userSettings);
-      console.log('Response from backend:', response);
-
-      const assistantMessage = { 
-        role: 'assistant', 
-        content: response.text,
-        intent: response.intent 
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-
+  
+      setMessages(prev => {
+        const filtered = prev.filter(m => !m.isTemporary);
+        return [...filtered, { 
+          role: 'assistant', 
+          content: response.text,
+          intent: response.intent 
+        }];
+      });
+  
       if (response.text && !isSpeaking) {
         playTextToSpeech(response.text, setIsSpeaking, userSettings);
       }
-
+  
+      // ... rest of your existing logic (handle events, deletions, etc.)
+      
       if (response.intent === 'delete' && response.eventsToDelete) {
         if (response.requiresConfirmation) {
           console.log('Waiting for user confirmation to delete:', response.eventsToDelete);
@@ -270,7 +354,7 @@ export default function App() {
           content: 'Would you like me to add these to your calendar? Please connect your Google Calendar first.'
         }]);
       }
-
+  
       if (messages.length > 0) {
         const lastAssistantMessage = messages[messages.length - 1];
         if (lastAssistantMessage.content && lastAssistantMessage.content.includes('Would you like me to delete')) {
@@ -291,13 +375,18 @@ export default function App() {
           }
         }
       }
-
+  
     } catch (error) {
       console.error('Error processing message:', error);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `I'm having trouble processing that right now. ${error.message}`
-      }]);
+      
+      // Remove thinking message on error
+      setMessages(prev => {
+        const filtered = prev.filter(m => !m.isTemporary);
+        return [...filtered, {
+          role: 'assistant',
+          content: `I'm having trouble processing that right now. ${error.message}`
+        }];
+      });
     } finally {
       setLoading(false);
     }
@@ -391,17 +480,74 @@ export default function App() {
 
   const handleEventUpdate = async (updateAnalysis, eventToUpdate) => {
     if (!googleAccessToken || !eventToUpdate) {
+      setMessages(prev => prev.filter(m => !m.isTemporary));
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'I couldn\'t update that event. Please try again.'
       }]);
       return;
     }
-
+  
+    // Check if we have enough information to update
+    if (!updateAnalysis.newTime && !updateAnalysis.newDate && !updateAnalysis.newTitle) {
+      console.log('Not enough info to update - asking for clarification');
+      
+      setMessages(prev => prev.filter(m => !m.isTemporary));
+      
+      const eventStart = new Date(eventToUpdate.start);
+      const now = new Date();
+      
+      // Check if event is today or tomorrow
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrowStart = new Date(todayStart);
+      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+      const dayAfterStart = new Date(todayStart);
+      dayAfterStart.setDate(dayAfterStart.getDate() + 2);
+      
+      const eventDateStart = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate());
+      
+      let dateStr;
+      if (eventDateStart.getTime() === todayStart.getTime()) {
+        dateStr = 'today';
+      } else if (eventDateStart.getTime() === tomorrowStart.getTime()) {
+        dateStr = 'tomorrow';
+      } else {
+        dateStr = eventStart.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'America/New_York'
+        });
+      }
+      
+      const timeStr = eventStart.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: 'America/New_York'
+      });
+      
+      const clarificationMessage = `I understand you want to reschedule "${eventToUpdate.summary || eventToUpdate.title}" (currently scheduled for ${dateStr} at ${timeStr}). When would you like to reschedule it to?`;
+      
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: clarificationMessage
+      }]);
+      
+      if (userSettings.tts.enabled) {
+        playTextToSpeech(clarificationMessage, setIsSpeaking, userSettings);
+      }
+      
+      // Store the event we're waiting to reschedule
+      setPendingReschedule(eventToUpdate);
+      
+      return;
+    }
+  
     try {      
       let newStart = eventToUpdate.start;
       let newEnd = eventToUpdate.end;
-
+  
+      // Update time if provided
       if (updateAnalysis.newTime) {
         const newStartDate = new Date(updateAnalysis.newTime);
         const oldStart = new Date(eventToUpdate.start);
@@ -412,7 +558,7 @@ export default function App() {
         newStart = newStartDate.toISOString();
         newEnd = newEndDate.toISOString();
       }
-
+  
       const updatedData = {
         summary: updateAnalysis.newTitle || eventToUpdate.summary || eventToUpdate.title,
         description: eventToUpdate.description || '',
@@ -433,7 +579,7 @@ export default function App() {
             }
           : e
       ));
-
+  
       setRecentlyCreatedEvents(prev => prev.map(e =>
         e.id === eventToUpdate.id
           ? {
@@ -444,19 +590,57 @@ export default function App() {
             }
           : e
       ));
-
-      const timeStr = updateAnalysis.newTime 
-        ? ` to ${new Date(updateAnalysis.newTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })}`
-        : '';
+  
+      // Format the new time for the success message
+      let timeStr = '';
+      if (updateAnalysis.newTime) {
+        const newStartDate = new Date(updateAnalysis.newTime);
+        const now = new Date();
+        
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrowStart = new Date(todayStart);
+        tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+        const dayAfterStart = new Date(todayStart);
+        dayAfterStart.setDate(dayAfterStart.getDate() + 2);
+        
+        const newDateStart = new Date(newStartDate.getFullYear(), newStartDate.getMonth(), newStartDate.getDate());
+        
+        let datePrefix = '';
+        if (newDateStart.getTime() === todayStart.getTime()) {
+          datePrefix = 'today at ';
+        } else if (newDateStart.getTime() === tomorrowStart.getTime()) {
+          datePrefix = 'tomorrow at ';
+        } else {
+          datePrefix = newStartDate.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            timeZone: 'America/New_York'
+          }) + ' at ';
+        }
+        
+        const time = newStartDate.toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit', 
+          timeZone: 'America/New_York' 
+        });
+        
+        timeStr = ` to ${datePrefix}${time}`;
+      }
+      
+      const successMessage = `✓ I've updated "${eventToUpdate.summary || eventToUpdate.title}"${timeStr}.`;
       
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `✓ I've updated "${eventToUpdate.summary || eventToUpdate.title}"${timeStr}.`
+        content: successMessage
       }]);
       
-      if (!isSpeaking) {
-        playTextToSpeech(`I've updated ${eventToUpdate.summary || eventToUpdate.title}${timeStr}`, setIsSpeaking, userSettings);
+      if (userSettings.tts.enabled) {
+        playTextToSpeech(successMessage, setIsSpeaking, userSettings);
       }
+      
+      // Clear pending reschedule
+      setPendingReschedule(null);
       
     } catch (error) {
       console.error('Error updating event:', error);

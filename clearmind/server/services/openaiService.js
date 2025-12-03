@@ -230,7 +230,7 @@ ${allEventsContext}
 Respond with ONLY valid JSON:
 {
   "isUpdateRequest": true or false,
-  "eventToUpdate": "exact name of event to update (from the lists above)",
+  "eventToUpdate": "EXACT name of event from the lists above",
   "newTime": "ISO 8601 datetime if time change requested",
   "newDate": "ISO 8601 date if date change requested",
   "newTitle": "new title if renaming",
@@ -238,19 +238,23 @@ Respond with ONLY valid JSON:
   "reasoning": "brief explanation"
 }
 
-CRITICAL RULES:
+CRITICAL MATCHING RULES:
 1. "reschedule X for/to Y" = ALWAYS an update request (confidence 1.0)
 2. "move X to Y" = ALWAYS an update request (confidence 1.0)
 3. "change X to Y" = ALWAYS an update request (confidence 1.0)
-4. "X is too early/late, make it Y" = ALWAYS an update request (confidence 1.0)
-5. Match events case-insensitively (e.g., "Post Office" = "post office")
-6. If event name mentioned exists in either list, it's an update
-7. For time references like "4:30", determine if it's AM or PM based on context (default PM for afternoon/evening times)
+4. When user mentions part of an event name, find the BEST match from the lists above
+5. "post office" should match "Go to the post office" (not "Working")
+6. "dentist" should match "Dentist appointment" (not other events)
+7. Return the EXACT event title from the list, not a shortened version
+8. If user mentions a keyword, find ALL events containing that keyword and pick the MOST RELEVANT one
+9. For time references like "4:30", determine if it's AM or PM based on context (default PM for afternoon/evening times)
+
+IMPORTANT: If user says "the post office", "post office", or mentions any distinctive keyword from an event title, you MUST match it to the event containing those keywords, NOT to unrelated events like "Working".
 
 Examples:
-- "reschedule post office for 4:30" → isUpdateRequest: true, eventToUpdate: "Go to the post office"
-- "move dentist to 3pm" → isUpdateRequest: true
-- "that's too early, change it to 10am" → isUpdateRequest: true, use most recent event
+- "reschedule post office for 4:30" → eventToUpdate: "Go to the post office" (NOT "Working")
+- "move dentist to 3pm" → eventToUpdate: "Dentist appointment"
+- "that's too early, change it to 10am" → use most recent event
 - "add groceries at 5pm" → isUpdateRequest: false (new event)`;
 
     const completion = await openai.chat.completions.create({

@@ -59,13 +59,15 @@ function isTomorrow(dateStr) {
 
 export async function fetchCalendarEvents(accessToken) {
   try {
-    // Get events starting from now
+    // Get events starting from beginning of today (midnight)
     const now = new Date();
-    const timeMin = now.toISOString();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const timeMin = todayStart.toISOString();
     
     console.log('=== Fetching Google Calendar Events ===');
     console.log('Current time (UTC):', now.toISOString());
     console.log('Current time (local):', now.toLocaleString('en-US', { timeZone: USER_TIMEZONE }));
+    console.log('Fetching from (midnight today):', timeMin);
     console.log('Current date in timezone:', getCurrentDateInTimezone());
     
     const response = await fetch(
