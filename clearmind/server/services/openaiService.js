@@ -85,6 +85,7 @@ Rules for event extraction:
 
 TIME PARSING (CRITICAL):
 - "11:00" or "11" without AM/PM → Assume 11:00 AM (11:00:00), NOT PM
+- "12:15", "12:30", "12:45" without AM/PM → 12:15 PM, 12:30 PM, 12:45 PM (afternoon)
 - "1:00" or "1" without AM/PM → Assume 1:00 PM (13:00:00) if after noon
 - Times 1-11 without AM/PM → Assume AM
 - Times 12 without AM/PM → Assume 12:00 PM (noon)

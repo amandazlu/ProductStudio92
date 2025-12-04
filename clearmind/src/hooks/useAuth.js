@@ -14,6 +14,8 @@ export default function useAuth() {
       try {
         const savedToken = localStorage.getItem('google_calendar_token');
         const tokenExpiry = localStorage.getItem('google_calendar_token_expiry');
+        const savedEmail = localStorage.getItem('user_email');
+        const savedName = localStorage.getItem('user_name');
         
         if (savedToken && tokenExpiry) {
           const expiryTime = parseInt(tokenExpiry, 10);
@@ -23,17 +25,32 @@ export default function useAuth() {
             console.log('Restoring saved Google Calendar token');
             setGoogleAccessToken(savedToken);
             setIsAuthenticated(true);
+            
+            // FIX: Restore user info from localStorage
+            if (savedEmail) {
+              setUserEmail(savedEmail);
+              console.log('Restored user email:', savedEmail);
+            }
+            if (savedName) {
+              setUserName(savedName);
+              console.log('Restored user name:', savedName);
+            }
+            
             return savedToken;
           } else {
             console.log('Saved token expired, clearing...');
             localStorage.removeItem('google_calendar_token');
             localStorage.removeItem('google_calendar_token_expiry');
+            localStorage.removeItem('user_email');
+            localStorage.removeItem('user_name');
           }
         }
       } catch (error) {
         console.error('Error loading saved token:', error);
         localStorage.removeItem('google_calendar_token');
         localStorage.removeItem('google_calendar_token_expiry');
+        localStorage.removeItem('user_email');
+        localStorage.removeItem('user_name');
       }
       return null;
     };
@@ -85,6 +102,7 @@ export default function useAuth() {
             setUserName(userInfo.name);
             localStorage.setItem('user_email', userInfo.email);
             localStorage.setItem('user_name', userInfo.name);
+            console.log('User info saved:', { email: userInfo.email, name: userInfo.name });
           } catch (error) {
             console.error('Error fetching user info:', error);
           }
@@ -97,6 +115,11 @@ export default function useAuth() {
   const handleGoogleSignOut = () => {
     saveGoogleToken('');
     setIsAuthenticated(false);
+    setUserEmail('');
+    setUserName('');
+    // FIX: Also clear user info from localStorage on sign out
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_name');
   };
 
   return {

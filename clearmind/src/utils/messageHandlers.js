@@ -262,10 +262,12 @@ export async function handleEventUpdate(
         : e
     ));
 
+    // FIX: Update both title AND summary in recentlyCreatedEvents to match calendarEvents
     setRecentlyCreatedEvents(prev => prev.map(e =>
       e.id === eventToUpdate.id
         ? {
             ...e,
+            title: updatedEvent.summary,   // ← ADDED: Now updates title too
             summary: updatedEvent.summary,
             start: updatedEvent.start.dateTime || updatedEvent.start.date,
             end: updatedEvent.end.dateTime || updatedEvent.end.date

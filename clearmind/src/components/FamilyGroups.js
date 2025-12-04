@@ -1,6 +1,6 @@
 // src/components/FamilyGroups.js
-import React, { useState, useEffect } from 'react';
-import { Users, Plus, X, Check, Bell, BellOff, Settings, UserMinus, Mail, Clock } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Users, Plus, X, Check, Bell, UserMinus, Mail } from 'lucide-react';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/api';
 const ask = (msg) => window.confirm(msg);
@@ -12,6 +12,39 @@ export default function FamilyGroups({ userEmail, userName }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Wrap fetch functions in useCallback to stabilize their references
+  const fetchGroups = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/family-groups?userEmail=${userEmail}`);
+      const data = await response.json();
+      setGroups(data.groups || []);
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [userEmail]);
+
+  const fetchInvitations = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/family-groups/invitations/pending?userEmail=${userEmail}`);
+      const data = await response.json();
+      setInvitations(data.invitations || []);
+    } catch (error) {
+      console.error('Error fetching invitations:', error);
+    }
+  }, [userEmail]);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/family-groups/notifications/unread?userEmail=${userEmail}`);
+      const data = await response.json();
+      setNotifications(data.notifications || []);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  }, [userEmail]);
 
   useEffect(() => {
     if (userEmail) {
@@ -27,39 +60,7 @@ export default function FamilyGroups({ userEmail, userName }) {
       
       return () => clearInterval(interval);
     }
-  }, [userEmail]);
-
-  const fetchGroups = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/family-groups?userEmail=${userEmail}`);
-      const data = await response.json();
-      setGroups(data.groups || []);
-    } catch (error) {
-      console.error('Error fetching groups:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchInvitations = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/family-groups/invitations/pending?userEmail=${userEmail}`);
-      const data = await response.json();
-      setInvitations(data.invitations || []);
-    } catch (error) {
-      console.error('Error fetching invitations:', error);
-    }
-  };
-
-  const fetchNotifications = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/family-groups/notifications/unread?userEmail=${userEmail}`);
-      const data = await response.json();
-      setNotifications(data.notifications || []);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    }
-  };
+  }, [userEmail, fetchGroups, fetchInvitations, fetchNotifications]);
 
   const createGroup = async (name, description) => {
     try {

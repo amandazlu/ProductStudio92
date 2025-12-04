@@ -13,8 +13,8 @@ const MAX_RECENT_EVENTS = 3;
 const THINKING_MESSAGES = [
   "Just a moment...",
   "One second...",
-  "Got it, working on that...",
-  "On it...",
+  "Got it...",
+  "I see...",
   "One moment..."
 ];
 
@@ -25,6 +25,8 @@ const PENDING_STATES = {
   CONFLICT: 'conflict',
   DELETE: 'delete'
 };
+
+const MAX_RESCHEDULE_ATTEMPTS = 3; // Maximum retry attempts before giving up
 
 /**
  * Custom hook for processing user messages with proper state management
@@ -46,7 +48,8 @@ export default function useMessageProcessing({
   // Unified pending state - only one operation can be pending at a time
   const [pendingOperation, setPendingOperation] = useState({
     type: PENDING_STATES.NONE,
-    data: null
+    data: null,
+    retryCount: 0 // Track number of retry attempts
   });
 
   /**
@@ -117,14 +120,14 @@ export default function useMessageProcessing({
    * Utility: Clear pending operation
    */
   const clearPendingOperation = () => {
-    setPendingOperation({ type: PENDING_STATES.NONE, data: null });
+    setPendingOperation({ type: PENDING_STATES.NONE, data: null, retryCount: 0 });
   };
 
   /**
    * Handler: Pending reschedule operation
    */
   const handlePendingReschedule = async (text) => {
-    const { data: eventToReschedule } = pendingOperation;
+    const { data: eventToReschedule, retryCount } = pendingOperation;
     
     // Check for cancellation
     const cancelWords = ['no', 'wrong', 'not that', 'different', 'cancel', 'nevermind'];
@@ -152,16 +155,32 @@ export default function useMessageProcessing({
         setMessages,
         setCalendarEvents,
         setRecentlyCreatedEvents,
-        (data) => setPendingOperation({ type: PENDING_STATES.RESCHEDULE, data }),
+        (data) => setPendingOperation({ type: PENDING_STATES.RESCHEDULE, data, retryCount: 0 }),
         isSpeaking,
         setIsSpeaking
       );
       clearPendingOperation();
     } else {
-      // Still couldn't understand the new time
+      // Check if we've exceeded max retry attempts
+      if (retryCount >= MAX_RESCHEDULE_ATTEMPTS - 1) {
+        const giveUpMessage = "I'm having trouble understanding the time. Let's try again from the start - which event would you like to reschedule?";
+        replaceTemporaryMessage(giveUpMessage);
+        await playTTSIfEnabled(giveUpMessage);
+        clearPendingOperation();
+        return;
+      }
+      
+      // Still couldn't understand the new time - increment retry counter
       const clarification = "I'm not sure about that time. Could you say it again? For example, 'tomorrow at 3pm' or 'next Monday at 10am'.";
       replaceTemporaryMessage(clarification);
       await playTTSIfEnabled(clarification);
+      
+      // Increment retry count but stay in pending state
+      setPendingOperation({
+        type: PENDING_STATES.RESCHEDULE,
+        data: eventToReschedule,
+        retryCount: retryCount + 1
+      });
     }
   };
 
@@ -345,7 +364,12 @@ export default function useMessageProcessing({
       return false; // Not an update request
     }
     
-    // Find the event to update (also filter nulls during search)
+    console.log('=== FRONTEND: Looking for event to update ===');
+    console.log('Event name from AI:', updateAnalysis.eventToUpdate);
+    console.log('Available recent events:', validRecentEvents.map(e => ({name: e.summary || e.title, id: e.id})));
+    console.log('Available calendar events:', validCalendarEvents.map(e => ({name: e.summary || e.title, id: e.id})));
+    
+    // Find the event to update
     const eventNameFromAI = (updateAnalysis.eventToUpdate || '').toLowerCase();
     const allValidEvents = [...validRecentEvents, ...validCalendarEvents].filter(e => e != null);
     
@@ -353,8 +377,16 @@ export default function useMessageProcessing({
       const eventName = (e.summary || e.title || '').toLowerCase();
       return eventName === eventNameFromAI || 
              eventName.includes(eventNameFromAI) ||
+             eventNameFromAI.includes(eventName) ||
              eventNameFromAI.split(' ').filter(w => w.length > 3).some(word => eventName.includes(word));
     });
+    
+    if (!eventToUpdate) {
+      console.log('❌ No matching event found');
+    } else {
+      console.log('✓ Found event:', eventToUpdate.summary || eventToUpdate.title, 'ID:', eventToUpdate.id);
+    }
+    console.log('===============================================');
     
     if (eventToUpdate) {
       // Remove temporary message - handleEventUpdate will add its own
@@ -367,7 +399,7 @@ export default function useMessageProcessing({
         setMessages,
         setCalendarEvents,
         setRecentlyCreatedEvents,
-        (data) => setPendingOperation({ type: PENDING_STATES.RESCHEDULE, data }),
+        (data) => setPendingOperation({ type: PENDING_STATES.RESCHEDULE, data, retryCount: 0 }),
         isSpeaking,
         setIsSpeaking
       );
@@ -390,7 +422,8 @@ export default function useMessageProcessing({
     if (response.intent === 'delete' && response.requiresConfirmation && response.eventsToDelete) {
       setPendingOperation({
         type: PENDING_STATES.DELETE,
-        data: response.eventsToDelete
+        data: response.eventsToDelete,
+        retryCount: 0
       });
       return;
     }
@@ -399,7 +432,8 @@ export default function useMessageProcessing({
     if (response.requiresUserDecision && response.hasConflicts && response.eventsData?.length > 0) {
       setPendingOperation({
         type: PENDING_STATES.CONFLICT,
-        data: response.eventsData[0] // Store first conflicting event
+        data: response.eventsData[0], // Store first conflicting event
+        retryCount: 0
       });
       return;
     }
@@ -430,6 +464,28 @@ export default function useMessageProcessing({
   };
 
   /**
+   * Utility: Check if message is a quick response (yes/no/cancel)
+   */
+  const isQuickResponse = (text) => {
+    const quickWords = [
+      'yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 
+      'no', 'nope', 'nah', 
+      'cancel', 'nevermind', 'never mind',
+      'confirm', 'accept', 'decline',
+      'add it', 'add anyway', 'go ahead', 'do it'
+    ];
+    
+    const lowerText = text.toLowerCase().trim();
+    
+    // Check if the entire message is just a quick word (or very short)
+    if (lowerText.length <= 15) {
+      return quickWords.some(word => lowerText === word || lowerText.includes(word));
+    }
+    
+    return false;
+  };
+
+  /**
    * Main message processing function
    */
   const processMessage = async (text) => {
@@ -439,15 +495,22 @@ export default function useMessageProcessing({
     const userMessage = { role: 'user', content: text };
     setMessages(prev => [...prev, userMessage]);
     
-    // Show thinking message
-    const thinkingMessage = getRandomThinkingMessage();
-    setMessages(prev => [...prev, { 
-      role: 'assistant', 
-      content: thinkingMessage, 
-      isTemporary: true 
-    }]);
+    // Check if we should skip the thinking message for quick responses to pending operations
+    const hasPendingOperation = pendingOperation.type !== PENDING_STATES.NONE;
+    const skipThinking = hasPendingOperation && isQuickResponse(text);
     
-    await playTTSIfEnabled(thinkingMessage);
+    // Show thinking message (unless it's a quick response to a pending operation)
+    if (!skipThinking) {
+      const thinkingMessage = getRandomThinkingMessage();
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: thinkingMessage, 
+        isTemporary: true 
+      }]);
+      
+      await playTTSIfEnabled(thinkingMessage);
+    }
+    
     setLoading(true);
 
     try {

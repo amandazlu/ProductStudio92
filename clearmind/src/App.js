@@ -12,7 +12,6 @@ import useCalendarEvents from './hooks/useCalendarEvents.js';
 import useMessageProcessing from './hooks/useMessageProcessing.js';
 import FamilyGroups from './components/FamilyGroups.js';
 
-
 export default function App() {
   const [input, setInput] = useState('');
   const [showSettings, setShowSettings] = useState(false);
