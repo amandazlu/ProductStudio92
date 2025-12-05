@@ -40,7 +40,9 @@ export default function useMessageProcessing({
   setRecentlyCreatedEvents,
   userSettings,
   isSpeaking,
-  setIsSpeaking
+  setIsSpeaking,
+  userEmail,
+  userName
 }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -157,7 +159,8 @@ export default function useMessageProcessing({
         setRecentlyCreatedEvents,
         (data) => setPendingOperation({ type: PENDING_STATES.RESCHEDULE, data, retryCount: 0 }),
         isSpeaking,
-        setIsSpeaking
+        setIsSpeaking,
+        userEmail
       );
       clearPendingOperation();
     } else {
@@ -205,7 +208,8 @@ export default function useMessageProcessing({
         [conflictingEvent],
         googleAccessToken,
         setCalendarEvents,
-        setMessages
+        setMessages,
+        userEmails
       );
       
       addToRecentEvents(result.events);
@@ -268,7 +272,8 @@ export default function useMessageProcessing({
           [updatedEvent],
           googleAccessToken,
           setCalendarEvents,
-          setMessages
+          setMessages,
+          userEmail
         );
         
         addToRecentEvents(result.events);
@@ -301,7 +306,8 @@ export default function useMessageProcessing({
         [updatedEvent],
         googleAccessToken,
         setCalendarEvents,
-        setMessages
+        setMessages,
+        userEmail
       );
       
       addToRecentEvents(result.events);
@@ -333,7 +339,8 @@ export default function useMessageProcessing({
           eventsToDelete[0],
           googleAccessToken,
           setCalendarEvents,
-          setMessages
+          setMessages,
+          userEmail
         );
       }
       
@@ -401,7 +408,8 @@ export default function useMessageProcessing({
         setRecentlyCreatedEvents,
         (data) => setPendingOperation({ type: PENDING_STATES.RESCHEDULE, data, retryCount: 0 }),
         isSpeaking,
-        setIsSpeaking
+        setIsSpeaking,
+        userEmail
       );
       return true;
     }
@@ -447,7 +455,8 @@ export default function useMessageProcessing({
           eventsToCreate,
           googleAccessToken,
           setCalendarEvents,
-          setMessages
+          setMessages,
+          userEmail
         );
         
         addToRecentEvents(result.events);

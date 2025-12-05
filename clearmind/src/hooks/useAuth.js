@@ -69,6 +69,8 @@ export default function useAuth() {
     } else {
       localStorage.removeItem('google_calendar_token');
       localStorage.removeItem('google_calendar_token_expiry');
+      localStorage.removeItem('user_email');
+      localStorage.removeItem('user_name');
       console.log('Google Calendar token cleared');
     }
   };

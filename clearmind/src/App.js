@@ -37,8 +37,12 @@ export default function App() {
     setRecentlyCreatedEvents,
     userSettings,
     isSpeaking,
-    setIsSpeaking
+    setIsSpeaking,
+    userEmail,
+    userName
   });
+
+  
 
   useEffect(() => {
     setApiConfigured(!!process.env.REACT_APP_API_BASE_URL);
