@@ -209,7 +209,7 @@ export default function useMessageProcessing({
         googleAccessToken,
         setCalendarEvents,
         setMessages,
-        userEmails
+        userEmail
       );
       
       addToRecentEvents(result.events);
