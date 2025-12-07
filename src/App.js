@@ -5,12 +5,15 @@ import MessageList from './components/MessageList.js';
 import InputArea from './components/InputArea.js';
 import CalendarView from './components/CalendarView.js';
 import SignIn from './components/SignIn.js';
+import FamilyGroups from './components/FamilyGroups.js';
+import ScheduleOptimizer from './components/ScheduleOptimizer.js';
+
 import useSpeechToText from './hooks/useSpeechToText.js';
 import useAuth from './hooks/useAuth.js';
 import useSettings from './hooks/useSettings.js';
 import useCalendarEvents from './hooks/useCalendarEvents.js';
 import useMessageProcessing from './hooks/useMessageProcessing.js';
-import FamilyGroups from './components/FamilyGroups.js';
+import useScheduleOptimization from './hooks/useScheduleOptimization.js';
 
 export default function App() {
   const [input, setInput] = useState('');
@@ -40,12 +43,35 @@ export default function App() {
     setIsSpeaking
   });
 
+  const {
+    recommendations,
+    isOptimizing,
+    optimizeFromText,
+    clearRecommendations,
+    hasSchedulingIntent
+  } = useScheduleOptimization(calendarEvents, googleAccessToken);
+
+  // State to control optimizer visibility
+  const [showOptimizer, setShowOptimizer] = useState(false);
+
   useEffect(() => {
     setApiConfigured(!!process.env.REACT_APP_API_BASE_URL);
   }, []);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
+  
+    if (hasSchedulingIntent(input)) {
+      const result = await optimizeFromText(input, {
+        searchDays: 7,
+        includeWeekends: true
+      });
+      
+      if (result.success && result.recommendations?.length > 0) {
+        setShowOptimizer(true);
+      }
+    }
+    
     await processMessage(input);
     setInput('');
   };
@@ -66,6 +92,52 @@ export default function App() {
   if (!isAuthenticated) {
     return <SignIn onSignIn={handleGoogleSignIn} />;
   }
+
+  const handleAcceptSlot = async (task, slot) => {
+    try {
+      console.log('Scheduling task:', task.summary, 'at', slot.start);
+      
+      // This will use your existing calendar integration
+      // The createEvent function should already exist in your calendar service
+      const { createEvent } = require('./services/googleCalendar.js');
+      
+      const eventData = {
+        summary: task.summary,
+        description: task.description || '',
+        start: slot.start,
+        end: slot.end,
+        location: task.location || ''
+      };
+      
+      const newEvent = await createEvent(googleAccessToken, eventData);
+      
+      // Update calendar events in state
+      setCalendarEvents(prev => [...prev, {
+        id: newEvent.id,
+        title: newEvent.summary,
+        start: newEvent.start.dateTime,
+        end: newEvent.end.dateTime,
+        location: newEvent.location || ''
+      }]);
+      
+      // Add success message
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✓ Added "${task.summary}" to your calendar`
+      }]);
+      
+      // Hide optimizer after successful scheduling
+      setShowOptimizer(false);
+      clearRecommendations();
+      
+    } catch (error) {
+      console.error('Error scheduling:', error);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, I had trouble adding that to your calendar.'
+      }]);
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white">
@@ -133,6 +205,18 @@ export default function App() {
         loading={loading}
         isSpeaking={isSpeaking}
       />
+
+      {showOptimizer && recommendations && (
+        <ScheduleOptimizer
+          recommendations={recommendations}
+          onAcceptSlot={handleAcceptSlot}
+          onDismiss={() => {
+            setShowOptimizer(false);
+            clearRecommendations();
+          }}
+          isLoading={isOptimizing}
+        />
+      )}
 
       <InputArea
         input={input}
