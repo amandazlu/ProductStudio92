@@ -40,7 +40,9 @@ export default function App() {
     setRecentlyCreatedEvents,
     userSettings,
     isSpeaking,
-    setIsSpeaking
+    setIsSpeaking,
+    userEmail,
+    userName
   });
 
   const {
