@@ -5,6 +5,7 @@ import speechRoutes from './routes/speech.js';
 import calendarRoutes from './routes/calendar.js';
 import familyGroupsRoutes from './routes/familyGroups.js';
 import scheduleRoutes from './routes/schedule.js';
+import userSettingsRoutes from './routes/userSettings.js';
 
 
 dotenv.config();
@@ -14,7 +15,7 @@ const app = express();
 // CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
@@ -31,6 +32,7 @@ app.use('/api/speech', speechRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/family-groups', familyGroupsRoutes);
 app.use('/api/schedule', scheduleRoutes);
+app.use('/api/user-settings', userSettingsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

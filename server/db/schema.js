@@ -175,3 +175,71 @@ export function createNotification(groupId, type, triggeredBy, eventData, recipi
     readBy: []
   };
 }
+
+
+// User Settings Schema
+export const UserSettingsSchema = {
+  userEmail: 'string',
+  settings: {
+    tts: {
+      enabled: 'boolean',
+      voice: 'string',
+      speed: 'number'
+    },
+    empathy: {
+      level: 'string', // 'minimal' | 'balanced' | 'high'
+      tone: 'string'   // 'professional' | 'friendly' | 'warm'
+    }
+  },
+  createdAt: 'timestamp',
+  updatedAt: 'timestamp'
+};
+
+// Database operations for user settings
+export async function getUserSettings(userEmail) {
+  const settings = await readDB('user_settings.json');
+  return settings.find(s => s.userEmail === userEmail) || null;
+}
+
+export async function saveUserSettings(userEmail, settingsData) {
+  const allSettings = await readDB('user_settings.json');
+  const existingIndex = allSettings.findIndex(s => s.userEmail === userEmail);
+  
+  const settingsObject = {
+    userEmail,
+    settings: settingsData,
+    updatedAt: Date.now(),
+    createdAt: existingIndex === -1 ? Date.now() : allSettings[existingIndex].createdAt
+  };
+  
+  if (existingIndex !== -1) {
+    allSettings[existingIndex] = settingsObject;
+  } else {
+    allSettings.push(settingsObject);
+  }
+  
+  await writeDB('user_settings.json', allSettings);
+  return settingsObject;
+}
+
+export async function deleteUserSettings(userEmail) {
+  const allSettings = await readDB('user_settings.json');
+  const filtered = allSettings.filter(s => s.userEmail !== userEmail);
+  await writeDB('user_settings.json', filtered);
+  return true;
+}
+
+// Default settings factory
+export function getDefaultSettings() {
+  return {
+    tts: {
+      enabled: true,
+      voice: 'nova',
+      speed: 0.95
+    },
+    empathy: {
+      level: 'balanced',
+      tone: 'professional'
+    }
+  };
+}

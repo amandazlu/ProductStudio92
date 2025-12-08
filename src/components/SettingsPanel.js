@@ -1,11 +1,14 @@
+// src/components/SettingsPanel.js 
 import React, { useState } from 'react';
-import { Check, X, Volume2, Heart, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, X, Volume2, Heart, ChevronDown, ChevronUp, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 
 export default function SettingsPanel({ 
   googleAccessToken, 
   onSignOut,
   userSettings,
-  onUpdateSettings
+  onUpdateSettings,
+  userEmail,
+  isSaving = false
 }) {
   const [expandedSection, setExpandedSection] = useState(null);
 
@@ -72,7 +75,38 @@ export default function SettingsPanel({
   return (
     <div className="absolute top-[82px] left-0 right-0 bottom-0 bg-gray-800 z-40 overflow-y-auto">
       <div className="p-6 max-w-4xl mx-auto space-y-6">
-        <h2 className="text-xl font-bold mb-4">Settings</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold">Settings</h2>
+          
+          {/* Sync Status Indicator */}
+          <div className="flex items-center gap-2 text-sm">
+            {isSaving ? (
+              <>
+                <RefreshCw size={16} className="animate-spin text-blue-400" />
+                <span className="text-blue-400">Saving to cloud...</span>
+              </>
+            ) : (
+              <>
+                <Cloud size={16} className="text-green-400" />
+                <span className="text-green-400">Synced</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Cloud Sync Info */}
+        <div className="bg-blue-900/30 border border-blue-500/50 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <Cloud size={18} className="text-blue-400 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-gray-300">
+              <p className="font-semibold mb-1">Settings synced across devices</p>
+              <p className="text-xs text-gray-400">
+                Your preferences are saved to your account and will follow you on any device.
+                {userEmail && ` Signed in as ${userEmail}`}
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Text-to-Speech Settings */}
         <div className="bg-gray-700 rounded-lg p-4">
@@ -272,6 +306,11 @@ export default function SettingsPanel({
         {/* Account Section */}
         <div className="bg-gray-700 rounded-lg p-4 mb-6">
           <h3 className="font-semibold mb-2">Account</h3>
+          {userEmail && (
+            <p className="text-sm text-gray-300 mb-3">
+              Signed in as: {userEmail}
+            </p>
+          )}
           <button
             onClick={onSignOut}
             className="w-full px-4 py-2 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 rounded-lg transition-all text-white shadow-md"
@@ -279,7 +318,7 @@ export default function SettingsPanel({
             Sign Out
           </button>
           <p className="text-xs text-gray-400 mt-2">
-            This will sign you out and clear all your data
+            This will sign you out and clear your session
           </p>
         </div>
 

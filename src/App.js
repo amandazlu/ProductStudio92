@@ -1,3 +1,4 @@
+// src/App.js - UPDATED to use database settings
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header.js';
 import SettingsPanel from './components/SettingsPanel.js';
@@ -24,7 +25,10 @@ export default function App() {
   const [apiConfigured, setApiConfigured] = useState(false);
 
   const { isAuthenticated, googleAccessToken, userEmail, userName, handleGoogleSignIn, handleGoogleSignOut } = useAuth();
-  const { userSettings, updateSettings } = useSettings();
+  
+  // UPDATED: Pass userEmail to useSettings hook
+  const { userSettings, updateSettings, isLoading: settingsLoading, isSaving: settingsSaving } = useSettings(userEmail);
+  
   const { 
     calendarEvents, 
     setCalendarEvents, 
@@ -95,6 +99,18 @@ export default function App() {
     return <SignIn onSignIn={handleGoogleSignIn} />;
   }
 
+  // Show loading state while settings are being loaded from database
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading your settings...</p>
+        </div>
+      </div>
+    );
+  }
+
   const handleAcceptSlot = async (task, slot) => {
     try {
       console.log('Scheduling task:', task.summary, 'at', slot.start);
@@ -126,7 +142,7 @@ export default function App() {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: `✓ Added "${task.summary}" to your calendar`
-      }]);
+      }]); 
       
       // Hide optimizer after successful scheduling
       setShowOptimizer(false);
@@ -178,12 +194,21 @@ export default function App() {
         </div>
       )}
 
+      {/* Show settings saving indicator */}
+      {settingsSaving && (
+        <div className="bg-blue-600 text-white p-2 text-center text-xs">
+          💾 Saving your settings...
+        </div>
+      )}
+
       {showSettings && (
         <SettingsPanel
           googleAccessToken={googleAccessToken}
           onSignOut={handleGoogleSignOut}
           userSettings={userSettings}
           onUpdateSettings={updateSettings}
+          userEmail={userEmail}
+          isSaving={settingsSaving}
         />
       )}
 
@@ -197,14 +222,14 @@ export default function App() {
 
       {showFamilyGroups && (
         <FamilyGroups
-          userEmail={userEmail} // Get from your auth system
-          userName={userName}   // Get from your auth system
+          userEmail={userEmail}
+          userName={userName}
           googleAccessToken={googleAccessToken}
           onCalendarUpdate={async () => {
             const { fetchCalendarEvents } = await import('./services/googleCalendar.js');
             const events = await fetchCalendarEvents(googleAccessToken);
             setCalendarEvents(events || []);
-    }}
+          }}
         />
       )}
 
