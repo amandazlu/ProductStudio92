@@ -1,11 +1,13 @@
-// src/components/FamilyGroups.js
+// src/components/FamilyGroups.js - UPDATED VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, X, Check, Bell, UserMinus, Mail } from 'lucide-react';
+import FamilyGroupNotifications from './FamilyGroupNotifications.js';
+import { createCalendarEvent } from '../services/googleCalendar.js';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/api';
 const ask = (msg) => window.confirm(msg);
 
-export default function FamilyGroups({ userEmail, userName }) {
+export default function FamilyGroups({ userEmail, userName, googleAccessToken, onCalendarUpdate }) {
   const [groups, setGroups] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -13,7 +15,7 @@ export default function FamilyGroups({ userEmail, userName }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Wrap fetch functions in useCallback to stabilize their references
+  // Wrap fetch functions in useCallback
   const fetchGroups = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/family-groups?userEmail=${userEmail}`);
@@ -133,6 +135,42 @@ export default function FamilyGroups({ userEmail, userName }) {
     }
   };
 
+  // NEW: Handle accepting an event from a notification
+  const handleAcceptEvent = async (eventData, accessToken) => {
+    try {
+      if (!accessToken) {
+        alert('Please connect your Google Calendar first');
+        return;
+      }
+
+      // Create event in user's calendar
+      const calendarEventData = {
+        summary: eventData.eventTitle,
+        description: eventData.eventDescription || '',
+        start: eventData.eventStart,
+        end: eventData.eventEnd,
+        location: eventData.eventLocation || ''
+      };
+
+      await createCalendarEvent(accessToken, calendarEventData);
+      
+      // Notify parent component to refresh calendar
+      if (onCalendarUpdate) {
+        await onCalendarUpdate();
+      }
+
+      console.log('✓ Event added to calendar');
+    } catch (error) {
+      console.error('Error adding event to calendar:', error);
+      throw error;
+    }
+  };
+
+  // NEW: Handle declining an event
+  const handleDeclineEvent = async (notification) => {
+    console.log('Event declined:', notification.eventData.eventTitle);
+  };
+
   if (loading) {
     return (
       <div className="p-6 bg-gray-800">
@@ -200,22 +238,24 @@ export default function FamilyGroups({ userEmail, userName }) {
           </div>
         )}
 
-        {/* Unread Notifications */}
+        {/* Unread Notifications - ENHANCED */}
         {notifications.length > 0 && (
           <div className="bg-purple-900/30 border border-purple-500/50 rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <Bell size={20} className="text-purple-400" />
               Recent Notifications ({notifications.length})
             </h3>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {notifications.map(notif => (
-                <NotificationItem 
-                  key={notif.id} 
-                  notification={notif}
-                  groups={groups}
-                  onMarkRead={() => markNotificationRead(notif.id)}
-                />
-              ))}
+            <div className="max-h-[600px] overflow-y-auto">
+              <FamilyGroupNotifications
+                notifications={notifications}
+                groups={groups}
+                userEmail={userEmail}
+                googleAccessToken={googleAccessToken}
+                onAcceptEvent={handleAcceptEvent}
+                onDeclineEvent={handleDeclineEvent}
+                onMarkRead={markNotificationRead}
+                onRefresh={fetchNotifications}
+              />
             </div>
           </div>
         )}
@@ -576,49 +616,6 @@ function GroupDetailsModal({ group, userEmail, onClose, onRefresh }) {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function NotificationItem({ notification, groups, onMarkRead }) {
-  const group = groups.find(g => g.id === notification.groupId);
-  const groupName = group?.name || 'Unknown Group';
-  
-  const getNotificationMessage = () => {
-    const { type, eventData, triggeredBy } = notification;
-    const sender = triggeredBy.split('@')[0];
-    
-    switch (type) {
-      case 'event_created':
-        return `${sender} created "${eventData.eventTitle}" in ${groupName}`;
-      case 'event_updated':
-        return `${sender} updated "${eventData.eventTitle}" in ${groupName}`;
-      case 'event_deleted':
-        return `${sender} deleted "${eventData.eventTitle}" from ${groupName}`;
-      case 'member_joined':
-        return `${eventData.memberName} joined ${groupName}`;
-      case 'member_left':
-        return `${eventData.memberName} left ${groupName}`;
-      default:
-        return `New activity in ${groupName}`;
-    }
-  };
-
-  return (
-    <div className="bg-gray-700 rounded-lg p-3 flex items-start justify-between">
-      <div className="flex-1">
-        <p className="text-sm">{getNotificationMessage()}</p>
-        <p className="text-xs text-gray-400 mt-1">
-          {new Date(notification.createdAt).toLocaleString()}
-        </p>
-      </div>
-      <button
-        onClick={onMarkRead}
-        className="text-purple-400 hover:text-purple-300 p-1"
-        title="Mark as read"
-      >
-        <Check size={18} />
-      </button>
     </div>
   );
 }

@@ -13,9 +13,9 @@ export default function useSettings() {
     }
   });
 
-  // Load settings from localStorage on mount
+  // Load settings from sessionStorage on mount
   useEffect(() => {
-    const savedSettings = localStorage.getItem('clearmind_settings');
+    const savedSettings = sessionStorage.getItem('clearmind_settings');
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings);
@@ -27,9 +27,9 @@ export default function useSettings() {
     }
   }, []);
 
-  // Save settings to localStorage when they change
+  // Save settings to sessionStorage when they change
   useEffect(() => {
-    localStorage.setItem('clearmind_settings', JSON.stringify(userSettings));
+    sessionStorage.setItem('clearmind_settings', JSON.stringify(userSettings));
     console.log('Saved settings:', userSettings);
   }, [userSettings]);
 

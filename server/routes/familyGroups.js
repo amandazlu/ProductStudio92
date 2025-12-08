@@ -1,4 +1,4 @@
-// server/routes/familyGroups.js
+// server/routes/familyGroups.js - ENHANCED VERSION
 import express from 'express';
 import {
   getFamilyGroups,
@@ -15,16 +15,12 @@ import {
 
 const router = express.Router();
 
-// Middleware to get user email from request (you'll need to implement auth)
+// Middleware to get user email from request
 function getUserEmail(req) {
-  // TODO: Implement proper authentication
-  // For now, accept from request body or query params
   const email = req.body?.userEmail || req.query?.userEmail;
-  
   if (!email) {
     throw new Error('User email is required');
   }
-  
   return email;
 }
 
@@ -38,8 +34,6 @@ router.get('/', async (req, res) => {
     }
     
     const allGroups = await getFamilyGroups();
-    
-    // Filter groups where user is a member
     const userGroups = allGroups.filter(group => 
       group.members.some(member => member.email === userEmail)
     );
@@ -86,14 +80,11 @@ router.put('/:groupId', async (req, res) => {
     }
     
     const group = allGroups[groupIndex];
-    
-    // Check if user is admin
     const member = group.members.find(m => m.email === userEmail);
     if (!member || member.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can update the group' });
     }
     
-    // Update group
     if (name) group.name = name;
     if (description !== undefined) group.description = description;
     group.updatedAt = Date.now();
@@ -117,19 +108,16 @@ router.delete('/:groupId', async (req, res) => {
     }
     
     const allGroups = await getFamilyGroups();
-    
     const group = allGroups.find(g => g.id === groupId);
     if (!group) {
       return res.status(404).json({ error: 'Group not found' });
     }
     
-    // Check if user is admin
     const member = group.members.find(m => m.email === userEmail);
     if (!member || member.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can delete the group' });
     }
     
-    // Remove group
     const updatedGroups = allGroups.filter(g => g.id !== groupId);
     await saveFamilyGroups(updatedGroups);
     
@@ -157,18 +145,15 @@ router.post('/:groupId/invite', async (req, res) => {
       return res.status(404).json({ error: 'Group not found' });
     }
     
-    // Check if user is admin
     const member = group.members.find(m => m.email === userEmail);
     if (!member || member.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can invite members' });
     }
     
-    // Check if already a member
     if (group.members.some(m => m.email === invitedEmail)) {
       return res.status(400).json({ error: 'User is already a member' });
     }
     
-    // Check for existing pending invitation
     const allInvitations = await getInvitations();
     const existingInvitation = allInvitations.find(
       inv => inv.groupId === groupId && 
@@ -180,7 +165,6 @@ router.post('/:groupId/invite', async (req, res) => {
       return res.status(400).json({ error: 'Invitation already sent' });
     }
     
-    // Create invitation
     const invitation = createInvitation(groupId, group.name, userEmail, invitedEmail);
     allInvitations.push(invitation);
     await saveInvitations(allInvitations);
@@ -202,7 +186,6 @@ router.get('/invitations/pending', async (req, res) => {
     }
     
     const allInvitations = await getInvitations();
-    
     const userInvitations = allInvitations.filter(
       inv => inv.invitedEmail === userEmail && 
              inv.status === 'pending' &&
@@ -241,7 +224,6 @@ router.post('/invitations/:invitationId/accept', async (req, res) => {
       return res.status(400).json({ error: 'Invitation has expired' });
     }
     
-    // Add user to group
     const allGroups = await getFamilyGroups();
     const group = allGroups.find(g => g.id === invitation.groupId);
     
@@ -263,12 +245,9 @@ router.post('/invitations/:invitationId/accept', async (req, res) => {
     });
     
     await saveFamilyGroups(allGroups);
-    
-    // Update invitation status
     invitation.status = 'accepted';
     await saveInvitations(allInvitations);
     
-    // Create notification
     const allNotifications = await getNotifications();
     const notification = createNotification(
       group.id,
@@ -314,7 +293,7 @@ router.post('/invitations/:invitationId/decline', async (req, res) => {
   }
 });
 
-// POST /api/family-groups/:groupId/notify - Send notification about event change
+// POST /api/family-groups/:groupId/notify - ENHANCED: Send notification with full event details
 router.post('/:groupId/notify', async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -331,7 +310,6 @@ router.post('/:groupId/notify', async (req, res) => {
       return res.status(404).json({ error: 'Group not found' });
     }
     
-    // Check if user is a member
     if (!group.members.some(m => m.email === userEmail)) {
       return res.status(403).json({ error: 'You are not a member of this group' });
     }
@@ -339,7 +317,7 @@ router.post('/:groupId/notify', async (req, res) => {
     // Get recipients based on notification preferences
     const recipients = group.members
       .filter(m => {
-        if (m.email === userEmail) return false; // Don't notify the person who made the change
+        if (m.email === userEmail) return false;
         
         const prefs = m.notificationPreferences;
         if (type === 'event_created') return prefs.eventCreated;
@@ -354,13 +332,37 @@ router.post('/:groupId/notify', async (req, res) => {
       return res.json({ message: 'No members to notify' });
     }
     
-    // Create notification
+    // ENHANCED: Include full event details with formatted time/date
+    const enhancedEventData = {
+      ...eventData,
+      eventStart: eventData.eventStart,
+      eventEnd: eventData.eventEnd,
+      eventLocation: eventData.eventLocation || null,
+      eventDescription: eventData.eventDescription || '',
+      // Format for display
+      formattedDate: new Date(eventData.eventStart).toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'America/New_York'
+      }),
+      formattedTime: new Date(eventData.eventStart).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: 'America/New_York'
+      }),
+      // Add group context
+      groupId: groupId,
+      groupName: group.name
+    };
+    
     const allNotifications = await getNotifications();
     const notification = createNotification(
       groupId,
       type,
       userEmail,
-      eventData,
+      enhancedEventData,
       recipients
     );
     
@@ -374,6 +376,91 @@ router.post('/:groupId/notify', async (req, res) => {
   }
 });
 
+// NEW: POST /api/family-groups/notifications/:notificationId/accept-event
+// Accept an event invitation from a notification
+router.post('/notifications/:notificationId/accept-event', async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const { userEmail } = req.body;
+    
+    const allNotifications = await getNotifications();
+    const notification = allNotifications.find(n => n.id === notificationId);
+    
+    if (!notification) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    
+    if (!notification.recipients.includes(userEmail)) {
+      return res.status(403).json({ error: 'This notification is not for you' });
+    }
+    
+    // Mark notification as read
+    if (!notification.readBy.includes(userEmail)) {
+      notification.readBy.push(userEmail);
+    }
+    
+    // Track acceptance
+    if (!notification.acceptedBy) {
+      notification.acceptedBy = [];
+    }
+    if (!notification.acceptedBy.includes(userEmail)) {
+      notification.acceptedBy.push(userEmail);
+    }
+    
+    await saveNotifications(allNotifications);
+    
+    // Return event data so the frontend can add it to the user's calendar
+    res.json({ 
+      message: 'Event accepted',
+      eventData: notification.eventData,
+      notification
+    });
+  } catch (error) {
+    console.error('Error accepting event:', error);
+    res.status(500).json({ error: 'Failed to accept event' });
+  }
+});
+
+// NEW: POST /api/family-groups/notifications/:notificationId/decline-event
+// Decline an event invitation from a notification
+router.post('/notifications/:notificationId/decline-event', async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const { userEmail } = req.body;
+    
+    const allNotifications = await getNotifications();
+    const notification = allNotifications.find(n => n.id === notificationId);
+    
+    if (!notification) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    
+    if (!notification.recipients.includes(userEmail)) {
+      return res.status(403).json({ error: 'This notification is not for you' });
+    }
+    
+    // Mark notification as read
+    if (!notification.readBy.includes(userEmail)) {
+      notification.readBy.push(userEmail);
+    }
+    
+    // Track decline
+    if (!notification.declinedBy) {
+      notification.declinedBy = [];
+    }
+    if (!notification.declinedBy.includes(userEmail)) {
+      notification.declinedBy.push(userEmail);
+    }
+    
+    await saveNotifications(allNotifications);
+    
+    res.json({ message: 'Event declined' });
+  } catch (error) {
+    console.error('Error declining event:', error);
+    res.status(500).json({ error: 'Failed to decline event' });
+  }
+});
+
 // GET /api/family-groups/notifications - Get notifications for a user
 router.get('/notifications/unread', async (req, res) => {
   try {
@@ -384,14 +471,13 @@ router.get('/notifications/unread', async (req, res) => {
     }
     
     const allNotifications = await getNotifications();
-    
     const userNotifications = allNotifications
       .filter(notif => 
         notif.recipients.includes(userEmail) && 
         !notif.readBy.includes(userEmail)
       )
       .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 20); // Last 20 unread notifications
+      .slice(0, 20);
     
     res.json({ notifications: userNotifications });
   } catch (error) {
@@ -461,7 +547,7 @@ router.put('/:groupId/preferences', async (req, res) => {
   }
 });
 
-// DELETE /api/family-groups/:groupId/members/:memberEmail - Remove member (or leave group)
+// DELETE /api/family-groups/:groupId/members/:memberEmail - Remove member
 router.delete('/:groupId/members/:memberEmail', async (req, res) => {
   try {
     const { groupId, memberEmail } = req.params;
@@ -483,12 +569,10 @@ router.delete('/:groupId/members/:memberEmail', async (req, res) => {
       return res.status(403).json({ error: 'You are not a member of this group' });
     }
     
-    // Check permissions: admin can remove anyone, members can only remove themselves
     if (memberEmail !== userEmail && currentMember.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can remove other members' });
     }
     
-    // Don't allow removing the last admin
     const admins = group.members.filter(m => m.role === 'admin');
     const memberToRemove = group.members.find(m => m.email === memberEmail);
     
@@ -496,11 +580,9 @@ router.delete('/:groupId/members/:memberEmail', async (req, res) => {
       return res.status(400).json({ error: 'Cannot remove the last admin. Assign another admin first.' });
     }
     
-    // Remove member
     group.members = group.members.filter(m => m.email !== memberEmail);
     await saveFamilyGroups(allGroups);
     
-    // Create notification
     const allNotifications = await getNotifications();
     const notification = createNotification(
       groupId,

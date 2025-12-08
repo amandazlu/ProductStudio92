@@ -199,6 +199,12 @@ export default function App() {
         <FamilyGroups
           userEmail={userEmail} // Get from your auth system
           userName={userName}   // Get from your auth system
+          googleAccessToken={googleAccessToken}
+          onCalendarUpdate={async () => {
+            const { fetchCalendarEvents } = await import('./services/googleCalendar.js');
+            const events = await fetchCalendarEvents(googleAccessToken);
+            setCalendarEvents(events || []);
+    }}
         />
       )}
 
